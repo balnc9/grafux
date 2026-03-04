@@ -82,27 +82,6 @@ function isConnected(a, b) {
   return nbrs ? nbrs.has(b.id) : false;
 }
 
-// ─── Cursor repulsion force ───────────────────────────────────────────────────
-function makeCursorForce() {
-  const STRENGTH = 2800;
-  const RADIUS = 110;
-
-  return function force(alpha) {
-    const [wx, wy] = screenToSim(mouse.x, mouse.y);
-    for (const n of graphData.nodes) {
-      if (n.fx != null) continue; // skip pinned/dragged nodes
-      const dx = n.x - wx;
-      const dy = n.y - wy;
-      const dist = Math.hypot(dx, dy);
-      if (dist < RADIUS && dist > 1) {
-        const f = (STRENGTH * alpha) / (dist * dist);
-        n.vx += (dx / dist) * f;
-        n.vy += (dy / dist) * f;
-      }
-    }
-  };
-}
-
 // ─── Simulation ───────────────────────────────────────────────────────────────
 function setupSimulation() {
   const cx = canvas.width / 2;
@@ -126,7 +105,6 @@ function setupSimulation() {
     .force('collide', d3.forceCollide()
       .radius(d => nodeRadius(d) + 5)
       .strength(0.8))
-    .force('cursor', makeCursorForce())
     .alphaDecay(0.02)
     .velocityDecay(0.35)
     .on('tick', scheduleRender);
@@ -243,19 +221,6 @@ function render() {
 }
 
 // ─── Interactions ─────────────────────────────────────────────────────────────
-let cooldownTimer = null;
-
-function reheatForCursor() {
-  if (!simulation) return;
-  if (simulation.alpha() < 0.06) {
-    simulation.alpha(0.06).restart();
-  }
-  clearTimeout(cooldownTimer);
-  cooldownTimer = setTimeout(() => {
-    if (simulation) simulation.alphaTarget(0);
-  }, 1200);
-}
-
 function setupInteractions() {
   // ── Node drag (registered BEFORE zoom so it fires first in capture phase) ──
   canvas.addEventListener('mousedown', onMouseDown, { capture: true });
@@ -314,8 +279,6 @@ function onMouseMove(e) {
     canvas.style.cursor = hoveredNode ? 'grab' : 'default';
     if (hoveredNode !== prev) scheduleRender();
   }
-
-  reheatForCursor();
 }
 
 function onMouseDown(e) {
