@@ -8,15 +8,17 @@ import (
 	"os/exec"
 	"runtime"
 
+	"grafux/config"
 	"grafux/scanner"
 	"grafux/server"
 )
 
 func main() {
-	depth := flag.Int("depth", 5, "Max directory depth (0 = unlimited)")
-	port := flag.Int("port", 0, "Port to serve on (0 = random available port)")
-	noOpen := flag.Bool("no-open", false, "Don't auto-open browser")
-	showHidden := flag.Bool("show-hidden", false, "Include hidden files and folders")
+	depthFlag := flag.Int("depth", 5, "Max directory depth (0 = unlimited)")
+	portFlag := flag.Int("port", 0, "Port to serve on (0 = random available port)")
+	noOpenFlag := flag.Bool("no-open", false, "Don't auto-open browser")
+	showHiddenFlag := flag.Bool("show-hidden", false, "Include hidden files and folders")
+	themeFlag := flag.String("theme", "", "UI theme: obsidian, forest, aurora, mono")
 	flag.Parse()
 
 	root := "."
@@ -28,30 +30,60 @@ func main() {
 		log.Fatalf("Cannot access directory: %v", err)
 	}
 
-	graph, err := scanner.Scan(root, scanner.Options{
-		MaxDepth:   *depth,
-		ShowHidden: *showHidden,
-	})
+	// Load config file; CLI flags override via flag.Visit below.
+	cfg, err := config.Load(root)
 	if err != nil {
-		log.Fatalf("Scan failed: %v", err)
+		log.Printf("Warning: could not load .grafux.yml: %v", err)
 	}
 
-	addr, err := server.Start(*port, graph)
-	if err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+	// Determine which flags were explicitly provided on the CLI.
+	explicit := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
+
+	depth := cfg.Depth
+	if explicit["depth"] {
+		depth = *depthFlag
+	}
+	port := cfg.Port
+	if explicit["port"] {
+		port = *portFlag
+	}
+	noOpen := cfg.NoOpen
+	if explicit["no-open"] {
+		noOpen = *noOpenFlag
+	}
+	showHidden := cfg.ShowHidden
+	if explicit["show-hidden"] {
+		showHidden = *showHiddenFlag
+	}
+	theme := cfg.Theme
+	if explicit["theme"] {
+		theme = *themeFlag
+	}
+
+	graph, scanErr := scanner.Scan(root, scanner.Options{
+		MaxDepth:   depth,
+		ShowHidden: showHidden,
+	})
+	if scanErr != nil {
+		log.Fatalf("Scan failed: %v", scanErr)
+	}
+
+	addr, startErr := server.Start(port, graph, theme)
+	if startErr != nil {
+		log.Fatalf("Server failed to start: %v", startErr)
 	}
 
 	url := fmt.Sprintf("http://%s", addr)
 	fmt.Printf("Grafux: %s\n", url)
-	fmt.Printf("  %d files · %d folders · depth %d\n",
-		graph.Meta.TotalFiles, graph.Meta.TotalFolders, *depth)
+	fmt.Printf("  %d files · %d folders · depth %d · theme: %s\n",
+		graph.Meta.TotalFiles, graph.Meta.TotalFolders, depth, theme)
 	fmt.Println("  Press Ctrl+C to stop")
 
-	if !*noOpen {
+	if !noOpen {
 		openBrowser(url)
 	}
 
-	// Block forever — server runs in a goroutine
 	select {}
 }
 

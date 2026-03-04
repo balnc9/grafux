@@ -1,10 +1,86 @@
 'use strict';
 
+// ─── Themes ───────────────────────────────────────────────────────────────────
+const THEMES = {
+  obsidian: {
+    bg:            '#13131f',
+    root:          '#f4a261',
+    folder:        '#e76f51',
+    file:          '#4db8ff',
+    edge:          'rgba(255,255,255,0.18)',
+    edgeHover:     'rgba(255,255,255,0.65)',
+    edgeDim:       'rgba(255,255,255,0.05)',
+    hoverRing:     'rgba(255,255,255,0.55)',
+    label:         'rgba(255,255,255,1)',
+    labelNeighbor: 'rgba(255,255,255,0.6)',
+    accent:        '#e76f51',
+  },
+  forest: {
+    bg:            '#0c180c',
+    root:          '#95d5b2',
+    folder:        '#52b788',
+    file:          '#40916c',
+    edge:          'rgba(149,213,178,0.2)',
+    edgeHover:     'rgba(149,213,178,0.7)',
+    edgeDim:       'rgba(149,213,178,0.04)',
+    hoverRing:     'rgba(149,213,178,0.6)',
+    label:         'rgba(210,240,220,1)',
+    labelNeighbor: 'rgba(210,240,220,0.65)',
+    accent:        '#52b788',
+  },
+  aurora: {
+    bg:            '#0b0b18',
+    root:          '#c4b5fd',
+    folder:        '#818cf8',
+    file:          '#38bdf8',
+    edge:          'rgba(196,181,253,0.18)',
+    edgeHover:     'rgba(196,181,253,0.7)',
+    edgeDim:       'rgba(196,181,253,0.04)',
+    hoverRing:     'rgba(196,181,253,0.6)',
+    label:         'rgba(230,225,255,1)',
+    labelNeighbor: 'rgba(230,225,255,0.65)',
+    accent:        '#818cf8',
+  },
+  mono: {
+    bg:            '#111111',
+    root:          '#ffffff',
+    folder:        '#bbbbbb',
+    file:          '#666666',
+    edge:          'rgba(255,255,255,0.14)',
+    edgeHover:     'rgba(255,255,255,0.6)',
+    edgeDim:       'rgba(255,255,255,0.03)',
+    hoverRing:     'rgba(255,255,255,0.5)',
+    label:         'rgba(255,255,255,1)',
+    labelNeighbor: 'rgba(255,255,255,0.55)',
+    accent:        '#bbbbbb',
+  },
+};
+
+let activeTheme = THEMES.obsidian;
+
+function applyTheme(name) {
+  activeTheme = THEMES[name] || THEMES.obsidian;
+  document.documentElement.style.setProperty('--bg', activeTheme.bg);
+  document.documentElement.style.setProperty('--accent', activeTheme.accent);
+  document.body.style.background = activeTheme.bg;
+  document.querySelectorAll('.theme-dot').forEach(d => {
+    d.classList.toggle('active', d.dataset.theme === name);
+  });
+  try { localStorage.setItem('grafux-theme', name); } catch (_) {}
+  scheduleRender();
+}
+
+function setupThemeSwitcher() {
+  document.querySelectorAll('.theme-dot').forEach(dot => {
+    dot.addEventListener('click', () => applyTheme(dot.dataset.theme));
+  });
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let graphData = { nodes: [], edges: [] };
 let simulation = null;
 let transform = d3.zoomIdentity;
-let mouse = { x: -9999, y: -9999 }; // canvas-relative screen coords
+let mouse = { x: -9999, y: -9999 };
 let hoveredNode = null;
 let dragNode = null;
 let rafPending = false;
@@ -35,9 +111,9 @@ function nodeRadius(n) {
 }
 
 function nodeColor(n) {
-  if (n.depth === 0)       return '#f4a261'; // root: bright amber
-  if (n.type === 'folder') return '#e76f51'; // folder: orange-red
-  return '#4db8ff';                          // file: blue
+  if (n.depth === 0)       return activeTheme.root;
+  if (n.type === 'folder') return activeTheme.folder;
+  return activeTheme.file;
 }
 
 // ─── Coordinate helpers ───────────────────────────────────────────────────────
@@ -51,7 +127,7 @@ function findNodeAt(sx, sy) {
   let minDist2 = Infinity;
   for (const n of graphData.nodes) {
     if (n.x === undefined) continue;
-    const r = nodeRadius(n) + 4; // slightly generous hit area
+    const r = nodeRadius(n) + 4;
     const dx = n.x - wx;
     const dy = n.y - wy;
     const d2 = dx * dx + dy * dy;
@@ -67,7 +143,6 @@ function findNodeAt(sx, sy) {
 function buildAdjacency() {
   adjacency.clear();
   for (const e of graphData.edges) {
-    // After d3-force initializes, source/target are node objects
     const s = typeof e.source === 'object' ? e.source.id : e.source;
     const t = typeof e.target === 'object' ? e.target.id : e.target;
     if (!adjacency.has(s)) adjacency.set(s, new Set());
@@ -87,7 +162,6 @@ function setupSimulation() {
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
 
-  // Start all nodes near center for a satisfying "explosion" on load
   for (const n of graphData.nodes) {
     n.x = cx + (Math.random() - 0.5) * 30;
     n.y = cy + (Math.random() - 0.5) * 30;
@@ -147,12 +221,10 @@ function render() {
     ctx.lineTo(tgt.x, tgt.y);
 
     if (hasHover) {
-      ctx.strokeStyle = highlighted
-        ? 'rgba(255, 255, 255, 0.65)'
-        : 'rgba(255, 255, 255, 0.05)';
+      ctx.strokeStyle = highlighted ? activeTheme.edgeHover : activeTheme.edgeDim;
       ctx.lineWidth = highlighted ? 1.5 / k : 0.5 / k;
     } else {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.strokeStyle = activeTheme.edge;
       ctx.lineWidth = 0.8 / k;
     }
     ctx.stroke();
@@ -177,7 +249,7 @@ function render() {
       ctx.fillStyle = color;
     } else if (isDim) {
       ctx.shadowBlur = 0;
-      ctx.fillStyle = color + '28';
+      ctx.fillStyle = color + '28'; // ~16% opacity
     } else {
       ctx.shadowBlur = 0;
       ctx.fillStyle = color;
@@ -186,11 +258,10 @@ function render() {
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // Bright ring on hover
     if (isHover) {
       ctx.beginPath();
       ctx.arc(n.x, n.y, r + 2.5 / k, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.strokeStyle = activeTheme.hoverRing;
       ctx.lineWidth = 1.5 / k;
       ctx.stroke();
     }
@@ -202,7 +273,6 @@ function render() {
     ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
     ctx.textBaseline = 'middle';
 
-    // Label hovered node and its neighbors
     const labelNodes = graphData.nodes.filter(n =>
       n === hoveredNode || isConnected(n, hoveredNode)
     );
@@ -210,9 +280,7 @@ function render() {
     for (const n of labelNodes) {
       if (n.x === undefined) continue;
       const r = nodeRadius(n);
-      ctx.fillStyle = n === hoveredNode
-        ? 'rgba(255, 255, 255, 1)'
-        : 'rgba(255, 255, 255, 0.6)';
+      ctx.fillStyle = n === hoveredNode ? activeTheme.label : activeTheme.labelNeighbor;
       ctx.fillText(n.name, n.x + (r + 5) / k, n.y);
     }
   }
@@ -222,17 +290,14 @@ function render() {
 
 // ─── Interactions ─────────────────────────────────────────────────────────────
 function setupInteractions() {
-  // ── Node drag (registered BEFORE zoom so it fires first in capture phase) ──
   canvas.addEventListener('mousedown', onMouseDown, { capture: true });
   canvas.addEventListener('mousemove', onMouseMove);
   window.addEventListener('mouseup', onMouseUp);
   canvas.addEventListener('mouseleave', onMouseLeave);
 
-  // ── Zoom & pan ─────────────────────────────────────────────────────────────
   const zoomBehavior = d3.zoom()
     .scaleExtent([0.04, 14])
     .filter(event => {
-      // Prevent zoom/pan starting on a node (we handle that as drag)
       if (event.type === 'mousedown' && event.button === 0) {
         const rect = canvas.getBoundingClientRect();
         return !findNodeAt(event.clientX - rect.left, event.clientY - rect.top);
@@ -246,7 +311,6 @@ function setupInteractions() {
 
   d3.select(canvas).call(zoomBehavior);
 
-  // Double-click canvas to reset zoom
   canvas.addEventListener('dblclick', (e) => {
     const node = findNodeAt(
       e.clientX - canvas.getBoundingClientRect().left,
@@ -267,13 +331,11 @@ function onMouseMove(e) {
   mouse.y = e.clientY - rect.top;
 
   if (dragNode) {
-    // Update dragged node position
     const [wx, wy] = screenToSim(mouse.x, mouse.y);
     dragNode.fx = wx;
     dragNode.fy = wy;
     if (simulation) simulation.alphaTarget(0.3).restart();
   } else {
-    // Hover detection
     const prev = hoveredNode;
     hoveredNode = findNodeAt(mouse.x, mouse.y);
     canvas.style.cursor = hoveredNode ? 'grab' : 'default';
@@ -286,7 +348,7 @@ function onMouseDown(e) {
   const rect = canvas.getBoundingClientRect();
   const node = findNodeAt(e.clientX - rect.left, e.clientY - rect.top);
   if (node) {
-    e.stopImmediatePropagation(); // prevent zoom from starting pan
+    e.stopImmediatePropagation();
     dragNode = node;
     node.fx = node.x;
     node.fy = node.y;
@@ -317,10 +379,29 @@ function onMouseLeave() {
 async function init() {
   const statsEl = document.getElementById('stats');
 
+  setupThemeSwitcher();
+
   try {
-    const res = await fetch('/api/graph');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    graphData = await res.json();
+    // Fetch config and graph in parallel
+    const [cfgRes, graphRes] = await Promise.all([
+      fetch('/api/config'),
+      fetch('/api/graph'),
+    ]);
+
+    // Determine initial theme: localStorage → server config → default
+    let themeName = 'obsidian';
+    try { themeName = localStorage.getItem('grafux-theme') || themeName; } catch (_) {}
+    if (cfgRes.ok) {
+      const cfg = await cfgRes.json();
+      // Only use server theme if the user hasn't set a local preference
+      let hasLocal = false;
+      try { hasLocal = localStorage.getItem('grafux-theme') !== null; } catch (_) {}
+      if (!hasLocal && cfg.theme) themeName = cfg.theme;
+    }
+    applyTheme(themeName);
+
+    if (!graphRes.ok) throw new Error(`HTTP ${graphRes.status}`);
+    graphData = await graphRes.json();
 
     if (!graphData.nodes || graphData.nodes.length === 0) {
       statsEl.textContent = 'No files found';

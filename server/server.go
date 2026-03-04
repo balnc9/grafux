@@ -14,7 +14,11 @@ import (
 //go:embed web
 var webFS embed.FS
 
-func Start(port int, graph *scanner.Graph) (string, error) {
+type clientConfig struct {
+	Theme string `json:"theme"`
+}
+
+func Start(port int, graph *scanner.Graph, theme string) (string, error) {
 	mux := http.NewServeMux()
 
 	// Serve embedded frontend
@@ -33,6 +37,17 @@ func Start(port int, graph *scanner.Graph) (string, error) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Write(graphJSON)
+	})
+
+	// Config API endpoint — exposes server-side settings to the frontend
+	cfgJSON, err := json.Marshal(clientConfig{Theme: theme})
+	if err != nil {
+		return "", fmt.Errorf("marshal config: %w", err)
+	}
+	mux.HandleFunc("/api/config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Write(cfgJSON)
 	})
 
 	// Find an available port
