@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 
 	"grafux/config"
 	"grafux/scanner"
@@ -14,11 +15,13 @@ import (
 )
 
 func main() {
-	depthFlag := flag.Int("depth", 5, "Max directory depth (0 = unlimited)")
-	portFlag := flag.Int("port", 0, "Port to serve on (0 = random available port)")
-	noOpenFlag := flag.Bool("no-open", false, "Don't auto-open browser")
+	depthFlag      := flag.Int("depth", 5, "Max directory depth (0 = unlimited)")
+	portFlag       := flag.Int("port", 0, "Port to serve on (0 = random available port)")
+	noOpenFlag     := flag.Bool("no-open", false, "Don't auto-open browser")
 	showHiddenFlag := flag.Bool("show-hidden", false, "Include hidden files and folders")
-	themeFlag := flag.String("theme", "", "UI theme: obsidian, forest, aurora, mono")
+	themeFlag      := flag.String("theme", "", "UI theme: gruvbox, obsidian, forest, aurora, mono")
+	includeFlag    := flag.String("include", "", "Comma-separated extensions to include (e.g. .go,.md)")
+	excludeFlag    := flag.String("exclude", "", "Comma-separated extensions to exclude (e.g. .log,.tmp)")
 	flag.Parse()
 
 	root := "."
@@ -60,16 +63,25 @@ func main() {
 	if explicit["theme"] {
 		theme = *themeFlag
 	}
+	if explicit["include"] {
+		cfg.Include = splitExts(*includeFlag)
+	}
+	if explicit["exclude"] {
+		cfg.Exclude = splitExts(*excludeFlag)
+	}
+	cfg.Theme = theme
 
 	graph, scanErr := scanner.Scan(root, scanner.Options{
 		MaxDepth:   depth,
 		ShowHidden: showHidden,
+		Include:    cfg.Include,
+		Exclude:    cfg.Exclude,
 	})
 	if scanErr != nil {
 		log.Fatalf("Scan failed: %v", scanErr)
 	}
 
-	addr, startErr := server.Start(port, graph, theme)
+	addr, startErr := server.Start(port, graph, cfg)
 	if startErr != nil {
 		log.Fatalf("Server failed to start: %v", startErr)
 	}
@@ -77,7 +89,7 @@ func main() {
 	url := fmt.Sprintf("http://%s", addr)
 	fmt.Printf("Grafux: %s\n", url)
 	fmt.Printf("  %d files · %d folders · depth %d · theme: %s\n",
-		graph.Meta.TotalFiles, graph.Meta.TotalFolders, depth, theme)
+		graph.Meta.TotalFiles, graph.Meta.TotalFolders, depth, cfg.Theme)
 	fmt.Println("  Press Ctrl+C to stop")
 
 	if !noOpen {
@@ -85,6 +97,17 @@ func main() {
 	}
 
 	select {}
+}
+
+func splitExts(s string) []string {
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func openBrowser(url string) {

@@ -41,6 +41,8 @@ type Graph struct {
 type Options struct {
 	MaxDepth   int
 	ShowHidden bool
+	Include    []string // if non-empty, only include files with these extensions
+	Exclude    []string // exclude files with these extensions
 }
 
 var defaultIgnore = map[string]bool{
@@ -134,6 +136,17 @@ func Scan(root string, opts Options) (*Graph, error) {
 
 		nodeID := filepath.ToSlash(rel) // use forward slashes for consistency
 
+		// Extension-based filtering (files only)
+		if !info.IsDir() {
+			ext := filepath.Ext(name)
+			if len(opts.Include) > 0 && !extInList(ext, opts.Include) {
+				return nil
+			}
+			if len(opts.Exclude) > 0 && extInList(ext, opts.Exclude) {
+				return nil
+			}
+		}
+
 		node := Node{
 			ID:    nodeID,
 			Name:  name,
@@ -177,4 +190,13 @@ func Scan(root string, opts Options) (*Graph, error) {
 	}
 
 	return graph, nil
+}
+
+func extInList(ext string, list []string) bool {
+	for _, e := range list {
+		if strings.EqualFold(ext, e) {
+			return true
+		}
+	}
+	return false
 }

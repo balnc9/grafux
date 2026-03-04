@@ -5,12 +5,12 @@
 }
 
 :root {
-  --bg: #13131f;
-  --surface: rgba(255, 255, 255, 0.04);
-  --border: rgba(255, 255, 255, 0.08);
-  --text-primary: rgba(255, 255, 255, 0.85);
-  --text-muted: rgba(255, 255, 255, 0.35);
-  --accent: #e76f51;
+  --bg: #282828;
+  --surface: rgba(60, 56, 54, 0.8);
+  --border: rgba(168, 153, 132, 0.2);
+  --text-primary: rgba(235, 219, 178, 0.9);
+  --text-muted: rgba(168, 153, 132, 0.7);
+  --accent: #fe8019;
 }
 
 html, body {
@@ -84,6 +84,7 @@ html, body {
   border-color: rgba(255, 255, 255, 0.55);
 }
 
+.theme-dot[data-theme="gruvbox"]  { background: #fe8019; }
 .theme-dot[data-theme="obsidian"] { background: #e76f51; }
 .theme-dot[data-theme="forest"]   { background: #52b788; }
 .theme-dot[data-theme="aurora"]   { background: #818cf8; }

@@ -2,6 +2,19 @@
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
 const THEMES = {
+  gruvbox: {
+    bg:            '#282828',
+    root:          '#fabd2f',
+    folder:        '#fe8019',
+    file:          '#83a598',
+    edge:          'rgba(168,153,132,0.2)',
+    edgeHover:     'rgba(235,219,178,0.7)',
+    edgeDim:       'rgba(168,153,132,0.04)',
+    hoverRing:     'rgba(235,219,178,0.5)',
+    label:         'rgba(235,219,178,1)',
+    labelNeighbor: 'rgba(235,219,178,0.65)',
+    accent:        '#fe8019',
+  },
   obsidian: {
     bg:            '#13131f',
     root:          '#f4a261',
@@ -56,10 +69,19 @@ const THEMES = {
   },
 };
 
-let activeTheme = THEMES.obsidian;
+let activeTheme = THEMES.gruvbox;
+
+// Visual settings — defaults match config.Defaults(); overridden by /api/config response
+const settings = {
+  fileRadius:  5,
+  folderBase:  8,
+  folderScale: 2.5,
+  edgeWidth:   1.0,
+  labelZoom:   2.0,
+};
 
 function applyTheme(name) {
-  activeTheme = THEMES[name] || THEMES.obsidian;
+  activeTheme = THEMES[name] || THEMES.gruvbox;
   document.documentElement.style.setProperty('--bg', activeTheme.bg);
   document.documentElement.style.setProperty('--accent', activeTheme.accent);
   document.body.style.background = activeTheme.bg;
@@ -105,9 +127,10 @@ resize();
 // ─── Node visuals ─────────────────────────────────────────────────────────────
 function nodeRadius(n) {
   if (n.type === 'folder') {
-    return Math.max(10, 8 + Math.sqrt(n.children || 0) * 2.5);
+    const base = settings.folderBase;
+    return Math.max(base + 2, base + Math.sqrt(n.children || 0) * settings.folderScale);
   }
-  return 5;
+  return settings.fileRadius;
 }
 
 function nodeColor(n) {
@@ -206,6 +229,7 @@ function render() {
   ctx.scale(transform.k, transform.k);
 
   const k = transform.k;
+  const ew = settings.edgeWidth;
   const hasHover = hoveredNode !== null;
 
   // ── Edges ──────────────────────────────────────────────────────────────────
@@ -222,10 +246,10 @@ function render() {
 
     if (hasHover) {
       ctx.strokeStyle = highlighted ? activeTheme.edgeHover : activeTheme.edgeDim;
-      ctx.lineWidth = highlighted ? 1.5 / k : 0.5 / k;
+      ctx.lineWidth = highlighted ? (1.5 * ew) / k : (0.5 * ew) / k;
     } else {
       ctx.strokeStyle = activeTheme.edge;
-      ctx.lineWidth = 0.8 / k;
+      ctx.lineWidth = (0.8 * ew) / k;
     }
     ctx.stroke();
   }
@@ -268,21 +292,24 @@ function render() {
   }
 
   // ── Labels ─────────────────────────────────────────────────────────────────
-  if (hasHover) {
+  const showAllLabels = k >= settings.labelZoom;
+  if (hasHover || showAllLabels) {
     const fontSize = Math.max(9, 13 / k);
     ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
     ctx.textBaseline = 'middle';
 
-    const labelNodes = graphData.nodes.filter(n =>
-      n === hoveredNode || isConnected(n, hoveredNode)
-    );
-
-    for (const n of labelNodes) {
+    for (const n of graphData.nodes) {
       if (n.x === undefined) continue;
+      const isHover = n === hoveredNode;
+      const isNeighbor = hasHover && isConnected(n, hoveredNode);
+      if (!showAllLabels && !isHover && !isNeighbor) continue;
       const r = nodeRadius(n);
-      ctx.fillStyle = n === hoveredNode ? activeTheme.label : activeTheme.labelNeighbor;
+      const isDimmed = hasHover && !isHover && !isNeighbor;
+      ctx.fillStyle = isHover ? activeTheme.label : activeTheme.labelNeighbor;
+      ctx.globalAlpha = isDimmed ? 0.2 : 1;
       ctx.fillText(n.name, n.x + (r + 5) / k, n.y);
     }
+    ctx.globalAlpha = 1;
   }
 
   ctx.restore();
@@ -389,10 +416,16 @@ async function init() {
     ]);
 
     // Determine initial theme: localStorage → server config → default
-    let themeName = 'obsidian';
+    let themeName = 'gruvbox';
     try { themeName = localStorage.getItem('grafux-theme') || themeName; } catch (_) {}
     if (cfgRes.ok) {
       const cfg = await cfgRes.json();
+      // Apply visual settings from server config
+      if (cfg.fileRadius  != null) settings.fileRadius  = cfg.fileRadius;
+      if (cfg.folderBase  != null) settings.folderBase  = cfg.folderBase;
+      if (cfg.folderScale != null) settings.folderScale = cfg.folderScale;
+      if (cfg.edgeWidth   != null) settings.edgeWidth   = cfg.edgeWidth;
+      if (cfg.labelZoom   != null) settings.labelZoom   = cfg.labelZoom;
       // Only use server theme if the user hasn't set a local preference
       let hasLocal = false;
       try { hasLocal = localStorage.getItem('grafux-theme') !== null; } catch (_) {}

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 
+	"grafux/config"
 	"grafux/scanner"
 )
 
@@ -15,10 +16,15 @@ import (
 var webFS embed.FS
 
 type clientConfig struct {
-	Theme string `json:"theme"`
+	Theme       string  `json:"theme"`
+	FileRadius  float64 `json:"fileRadius"`
+	FolderBase  float64 `json:"folderBase"`
+	FolderScale float64 `json:"folderScale"`
+	EdgeWidth   float64 `json:"edgeWidth"`
+	LabelZoom   float64 `json:"labelZoom"`
 }
 
-func Start(port int, graph *scanner.Graph, theme string) (string, error) {
+func Start(port int, graph *scanner.Graph, cfg config.Config) (string, error) {
 	mux := http.NewServeMux()
 
 	// Serve embedded frontend
@@ -40,7 +46,14 @@ func Start(port int, graph *scanner.Graph, theme string) (string, error) {
 	})
 
 	// Config API endpoint — exposes server-side settings to the frontend
-	cfgJSON, err := json.Marshal(clientConfig{Theme: theme})
+	cfgJSON, err := json.Marshal(clientConfig{
+		Theme:       cfg.Theme,
+		FileRadius:  cfg.FileRadius,
+		FolderBase:  cfg.FolderBase,
+		FolderScale: cfg.FolderScale,
+		EdgeWidth:   cfg.EdgeWidth,
+		LabelZoom:   cfg.LabelZoom,
+	})
 	if err != nil {
 		return "", fmt.Errorf("marshal config: %w", err)
 	}
