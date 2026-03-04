@@ -9,13 +9,13 @@ Run `grf` in any folder → it scans the file tree, starts a localhost server, a
 ## Install
 
 ```bash
-go install github.com/mtwchin/grafux@latest
+go install github.com/balnc9/grafux@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/mtwchin/grafux
+git clone https://github.com/balnc9/grafux
 cd grafux
 go build -o grf .
 ```
