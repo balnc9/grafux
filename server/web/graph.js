@@ -88,7 +88,7 @@ function applyTheme(name) {
   document.querySelectorAll('.theme-dot').forEach(d => {
     d.classList.toggle('active', d.dataset.theme === name);
   });
-  try { localStorage.setItem('grafux-theme', name); } catch (_) {}
+  try { sessionStorage.setItem('grafux-theme', name); } catch (_) {}
   scheduleRender();
 }
 
@@ -415,9 +415,8 @@ async function init() {
       fetch('/api/graph'),
     ]);
 
-    // Determine initial theme: localStorage → server config → default
+    // Determine initial theme: server config → sessionStorage (within-session switch) → default
     let themeName = 'gruvbox';
-    try { themeName = localStorage.getItem('grafux-theme') || themeName; } catch (_) {}
     if (cfgRes.ok) {
       const cfg = await cfgRes.json();
       // Apply visual settings from server config
@@ -426,11 +425,10 @@ async function init() {
       if (cfg.folderScale != null) settings.folderScale = cfg.folderScale;
       if (cfg.edgeWidth   != null) settings.edgeWidth   = cfg.edgeWidth;
       if (cfg.labelZoom   != null) settings.labelZoom   = cfg.labelZoom;
-      // Only use server theme if the user hasn't set a local preference
-      let hasLocal = false;
-      try { hasLocal = localStorage.getItem('grafux-theme') !== null; } catch (_) {}
-      if (!hasLocal && cfg.theme) themeName = cfg.theme;
+      if (cfg.theme) themeName = cfg.theme;
     }
+    // sessionStorage overrides server theme only if user switched themes this session
+    try { themeName = sessionStorage.getItem('grafux-theme') || themeName; } catch (_) {}
     applyTheme(themeName);
 
     if (!graphRes.ok) throw new Error(`HTTP ${graphRes.status}`);
